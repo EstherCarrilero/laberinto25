@@ -1,36 +1,45 @@
 # Archivo que contiene el juego del laberinto
+from abc import ABC, abstractmethod
 
-class ElementoMapa:
+class ElementoMapa(ABC):
     """Clase base para los elementos del laberinto."""
+    def getPadre(self):
+        return self.padre
+    
+    def setPadre(self, padre):
+        self.padre = padre
+    
     def esPared(self):
         return False
     
     def esPuerta(self):
         return False
+    
+    def esHabitacion(self):
+        return False
+    
+    @abstractmethod
+    def entrar(self, alguien): #Método abstracto
+        pass
 
-class Pared(ElementoMapa):
-    """Representa una pared en el laberinto."""
-    def esPared(self):
-        return True
+class Contenedor(ElementoMapa): #INCOMPLETO
+    def __init__(self):
+        self.hijos = []
+        self.orientaciones = []
 
-class Puerta(ElementoMapa):
-    """Representa una puerta que conecta habitaciones."""
-    def __init__(self, abierta=False):
-        self.abierta = abierta
+    def getHijos(self):
+        return self.hijos
     
-    def esPuerta(self):
-        return True
-    
-    def estaAbierta(self):
-        return self.abierta
-    
-    def abrir(self):
-        self.abierta = True
-    
-    def cerrar(self):
-        self.abierta = False
+    def setHijos(self, hijos):
+        self.hijos = hijos
 
-class Habitacion:
+    def getOrientaciones(self):
+        return self.orientaciones
+    
+    def setOrientaciones(self, orientaciones):
+        self.orientaciones = orientaciones
+
+class Habitacion(Contenedor):
     """Representa una habitación en el laberinto con elementos en las 4 direcciones."""
     def __init__(self, numero):
         self.numero = numero
@@ -49,6 +58,59 @@ class Habitacion:
     
     def esHabitacion(self):
         return True
+
+class Pared(ElementoMapa):
+    """Representa una pared en el laberinto."""
+    def entrar(self):
+        print("Te has chocado con una pared")
+
+    def esPared(self):
+        return True
+    
+class ParedBomba(Pared):
+    def __init__(self):
+        self.activa = False
+
+    def getActiva(self):
+        return self.activa
+    
+    def setActiva(self, activa):
+        self.activa = activa
+
+    def entrar(self):
+        print("Te has chocado con una pared bomba")
+
+class Puerta(ElementoMapa):
+    """Representa una puerta que conecta habitaciones."""
+    def __init__(self):
+        self.abierta = False
+
+    def getAbierta(self):
+        return self.abierta
+    
+    def setAbierta(self, abierta):
+        self.abierta = abierta
+
+    def getLado1(self):
+        return self.lado1
+    
+    def setLado1(self, lado):
+        self.lado1 = lado
+
+    def getLado2(self):
+        return self.lado2
+    
+    def setLado2(self, lado):
+        self.lado2 = lado
+
+    def esPuerta(self):
+        return True
+    
+    def entrar(self):
+        if(self.abierta == True):
+            print("La puerta está abierta")
+        else:
+            print("Te has chocado con una puerta")
 
 class Creator:
     """Factory Method para crear el laberinto y sus elementos."""
