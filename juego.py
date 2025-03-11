@@ -1,48 +1,68 @@
 # Archivo que contiene el juego del laberinto
 from abc import ABC, abstractmethod
+from random import *
 
-class ElementoMapa(ABC):
+class ElementoMapa(ABC): #COMPLETA HASTA 11/03/2025
     """Clase base para los elementos del laberinto."""
-    def getPadre(self):
-        return self.padre
-    
-    def setPadre(self, padre):
+    def __init__(self, padre=None):
         self.padre = padre
-    
-    def esPared(self):
+
+    def es_pared(self):
         return False
     
-    def esPuerta(self):
+    def es_puerta(self):
         return False
     
-    def esHabitacion(self):
+    def es_habitacion(self):
         return False
     
     @abstractmethod
-    def entrar(self, alguien): #Método abstracto
+    def entrar(self, alguien):
         pass
 
-class Contenedor(ElementoMapa): #INCOMPLETO
-    def __init__(self):
+class Contenedor(ElementoMapa): #COMPLETA HASTA 11/03/2025
+    def __init__(self, padre=None):
+        super().__init__(padre)
         self.hijos = []
         self.orientaciones = []
-
-    def getHijos(self):
-        return self.hijos
     
-    def setHijos(self, hijos):
-        self.hijos = hijos
+    def agregar_hijo(self, unEM):
+        self.hijos.append(unEM)
+        unEM.padre = self
 
-    def getOrientaciones(self):
-        return self.orientaciones
+    def agregar_orientacion(self, unaOr): 
+        self.orientaciones.append(unaOr)
     
-    def setOrientaciones(self, orientaciones):
-        self.orientaciones = orientaciones
+    def eliminar_hijo(self, unEM):
+        if unEM in self.hijos:
+            self.hijos.remove(unEM)
+            unEM.padre = None
+        else:
+            print("No existe el objeto")
 
-class Habitacion(Contenedor):
+    def obtener_elemento_or(self, unaOr):
+        return unaOr.obtener_elemento_or_en(self)
+    
+    def obtener_orientacion(self):
+        ind = randint(1, len(self.orientaciones))
+        return self.orientaciones[ind]
+    
+    def poner_en_or_elemento(self, unaOr, unEM):
+        unaOr.poner_elemento_en(unEM, self)
+
+    # def recorrer(self, unBloque):
+    #     unBloque(self)
+    #     for hijo in self.hijos:
+    #         hijo.recorrer(unBloque)
+        
+    #     for ori in self.orientaciones:
+    #         ori.recorrer_contenedor(unBloque, self)
+
+class Habitacion(Contenedor): #COMPLETA HASTA 11/03/2025
     """Representa una habitación en el laberinto con elementos en las 4 direcciones."""
-    def __init__(self, numero):
-        self.numero = numero
+    def __init__(self, numero, padre=None):
+        super().__init__(padre)
+        self.num = numero
         self.elementos = {
             'norte': None,
             'sur': None,
@@ -50,14 +70,82 @@ class Habitacion(Contenedor):
             'oeste': None
         }
     
-    def establecerElemento(self, direccion, elemento):
-        self.elementos[direccion] = elemento
-    
-    def obtenerElementoOr(self, direccion):
-        return self.elementos[direccion]
-    
-    def esHabitacion(self):
+    def entrar(self, alguien):
+        print(f"{alguien} está en {self}")
+        alguien.posicion = self
+
+    def es_habitacion(self):
         return True
+    
+    def ir_al_norte(self, alguien):
+        self.elementos["norte"].entrar(alguien)
+
+    def ir_al_sur(self, alguien):
+        self.elementos["sur"].entrar(alguien)
+
+    def ir_al_este(self, alguien):
+        self.elementos["este"].entrar(alguien)
+
+    def ir_al_oeste(self, alguien):
+        self.elementos["oeste"].entrar(alguien)
+    
+    def __repr__(self):
+         return f"Hab {self.num}"
+    
+class Laberinto(Contenedor): #COMPLETA HASTA 11/03/2025 (modificar abrir_puertas y cerrar_puertas)
+    def __init__(self, padre=None):
+        super().__init__(padre)
+
+    def abrir_puertas(self):
+        for habitacion in self.hijos:
+            for orientacion, elemento in habitacion.orientaciones.items():
+                if isinstance(elemento, Puerta): #elemento.es_puerta
+                    elemento.abierta = True #elemento.abrir
+
+    def agregar_habitacion(self, unaHabitacion):
+        self.agregar_hijo(unaHabitacion)
+    
+    def cerrar_puertas(self):
+        for habitacion in self.hijos:
+            for orientacion, elemento in habitacion.orientaciones.items():
+                if isinstance(elemento, Puerta): #elemento.es_puerta
+                    elemento.abierta = False #elemento.cerrar
+    
+    def eliminar_habitacion(self, habitacion):
+        self.eliminar_hijo(habitacion)
+
+    def obtener_habitacion(self, num):
+        for habitacion in self.hijos:
+            if habitacion.num == num:
+                return habitacion
+        return None
+
+    def entrar(self, alguien):
+        hab1 = self.obtener_habitacion(1)
+        hab1.entrar(alguien)
+
+    def __repr__(self):
+         return f"Laberinto"
+    
+class Hoja(ElementoMapa): #COMPLETA HASTA 11/03/2025
+    def __init__(self, padre=None):
+        super().__init__(padre)
+
+class Decorator(Hoja): #COMPLETA HASTA 11/03/2025
+    def __init__(self, padre=None):
+        super().__init__(padre)
+        self.em = None
+
+class Bomba(Decorator): #COMPLETA HASTA 11/03/2025
+    def __init__(self, padre=None):
+        super().__init__(padre)
+        self.activa = False
+
+    def entrar(self, alguien):
+        if (self.activa):
+            print(f"{alguien} ha chocado con una bomba")
+        else:
+            self.em.entrar(alguien)
 
 class Pared(ElementoMapa):
     """Representa una pared en el laberinto."""
@@ -172,7 +260,7 @@ class Juego:
                 return hab
         return None
 
-#PRUEBA DEL JUEGO
+#PRUEBA DEL JUEGO (NO FUNCIONA - NO ACTUALIZADO)
 # Crear el juego y el factory method
 juego = Juego()
 fm = Creator()
