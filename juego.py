@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from abc import ABC, abstractmethod
 import random
@@ -192,6 +193,13 @@ class ElementoMapa(ABC):
         self.padre = padre
         self.comandos = []
 
+    @abstractmethod
+    def entrar(self, ente):
+        pass
+
+    def agregarComando(self, comando):
+        self.comandos.append(comando)
+
 class Contenedor(ElementoMapa):
     def __init__(self, padre=None, forma=None, num=0):
         super().__init__(padre)
@@ -217,10 +225,27 @@ class Contenedor(ElementoMapa):
 
     def obtener_orientacion_aleatoria(self):
         return self.forma.obtener_orientacion_aleatoria()
+    
+    def entrar(self, ente):
+        print(f"{ente} ha entrado en el contenedor {self.num}.")
+        ente.posicion = self
+        ente.buscarTunel()
 
 class Habitacion(Contenedor): pass
 class Armario(Contenedor): pass
-class Laberinto(Contenedor): pass
+class Laberinto(Contenedor):
+    def obtenerHabitacion(self, num):
+        for hijo in self.hijos:
+            if isinstance(hijo, Habitacion) and hijo.num == num:
+                return hijo
+        return None
+
+    def entrar(self, ente):
+        habitacion = self.obtenerHabitacion(1)
+        if habitacion:
+            habitacion.entrar(ente)
+        else:
+            print("No se encontró la habitación número 1.")
 
 class Pared(ElementoMapa): pass
 class ParedBomba(Pared):
@@ -255,8 +280,16 @@ class Tunel(Hoja):
         super().__init__()
         self.laberinto = laberinto
 
-    def entrar(self, juego):
-        self.laberinto = deepcopy(juego.prototipo)
+    def entrar(self, ente):
+        if self.laberinto is None:
+            if isinstance(ente, Personaje):
+                self.laberinto = deepcopy(ente.juego.prototipo)
+                print(f"{ente} ha creado un nuevo laberinto.")
+            else:
+                print("Solo un personaje puede crear un nuevo laberinto.")
+                return
+
+        self.laberinto.entrar(ente)
 
 # Clase Comando y sus subclases
 class Comando(ABC):
@@ -291,6 +324,9 @@ class Ente(ABC):
         self.vidas = vidas
         self.juego = juego
         self.estado_ente = estado_ente
+    
+    def buscarTunel(self):
+        pass
 
 class EstadoEnte(ABC): pass
 class Vivo(EstadoEnte): pass
@@ -301,13 +337,35 @@ class Bicho(Ente):
         super().__init__(poder, posicion, vidas, juego, estado_ente)
         self.modo = modo
 
+    def buscarTunel(self):
+        self.modo.buscarTunelBicho(self)
+    
+    def __str__(self):
+        return f"unBicho-{str(self.modo)}"
+
 class Personaje(Ente):
     def __init__(self, poder, posicion, vidas, juego, estado_ente, nombre):
         super().__init__(poder, posicion, vidas, juego, estado_ente)
         self.nombre = nombre
 
-class Modo(ABC): pass
-class Agresivo(Modo): pass
+class Modo(ABC):
+    def __str__(self):
+        return self.__class__.__name__
+    
+    def buscarTunelBicho(self, bicho):
+        pass
+
+class Agresivo(Modo):
+    def buscarTunelBicho(self, bicho):
+        if bicho.posicion:
+            for hijo in bicho.posicion.hijos:
+                if isinstance(hijo, Tunel):
+                    if hijo.laberinto:
+                        print(f"{bicho} ha encontrado un túnel y está entrando.")
+                        hijo.entrar(bicho)
+                    else:
+                        print(f"{bicho} ha encontrado un túnel, pero no tiene un laberinto creado.")
+                    return
 class Perezoso(Modo): pass
 
 # Clase Juego
@@ -318,6 +376,10 @@ class Juego:
         self.hilos = []
         self.person = person
         self.prototipo = prototipo
+
+    def agregarBicho(self, bicho):
+        self.bichos.append(bicho)
+        bicho.juego = self
 
 # Clase Creator
 class Creator:
@@ -377,6 +439,141 @@ class Creator:
 class CreatorB(Creator):
     def fabricarPared(self, padre=None):
         return ParedBomba(padre, activa=False)
+
+class LaberintoBuilder:
+    def __init__(self):
+        self.juego = None
+        self.laberinto = None
+
+    def obtenerJuego(self):
+        return self.juego
+
+    def fabricarLaberinto(self):
+        self.laberinto = Laberinto(forma=Cuadrado())
+
+    def fabricarArmarioEn(self, num, contenedor):
+        armario = Armario(forma=Cuadrado(), num=num)
+        for orientacion in armario.obtener_orientaciones():
+            armario.poner_en_or_elemento(orientacion, Pared(), armario)
+        contenedor.agregar_hijo(armario)
+        return armario
+
+    def fabricarBichoAgresivo(self, habitacion, estado_ente):
+        bicho = Bicho(poder=5, posicion=habitacion, vidas=5, juego=self.juego, estado_ente=estado_ente, modo=Agresivo())
+        return bicho
+    
+    def fabricarBichoPerezoso(self, habitacion):
+        bicho = Bicho(poder=1, posicion=habitacion, vidas=1, juego=self.juego, estado_ente=Vivo(), modo=Perezoso())
+        return bicho
+
+    def fabricarBichoModoPosicion(self, modo, num):
+        if modo == "agresivo":
+            bicho = self.fabricarBichoAgresivo(self.juego.laberinto.obtenerHabitacion(num))
+        elif modo == "perezoso":
+            bicho = self.fabricarBichoPerezoso(self.juego.laberinto.obtenerHabitacion(num))
+        else:
+            raise ValueError("Modo no reconocido.")
+
+        if bicho:
+            self.juego.agregarBicho(bicho)
+            bicho.posicion.entrar(bicho)
+
+    def fabricarBombaEn(self, contenedor):
+        bomba = Bomba()
+        contenedor.agregar_hijo(bomba)
+        return bomba
+
+    def fabricarEste(self):
+        return Este()
+
+    def fabricarOeste(self):
+        return Oeste()
+
+    def fabricarNorte(self):
+        return Norte()
+
+    def fabricarSur(self):
+        return Sur()
+
+    def fabricarForma(self):
+        forma = Cuadrado()
+        forma.agregar_orientacion(self.fabricarNorte())
+        forma.agregar_orientacion(self.fabricarSur())
+        forma.agregar_orientacion(self.fabricarEste())
+        forma.agregar_orientacion(self.fabricarOeste())
+        return forma
+    
+    def fabricarHabitacion(self, num):
+        habitacion = Habitacion(forma=self.fabricarForma(), num=num)
+        for orientacion in habitacion.obtener_orientaciones():
+            habitacion.poner_en_or_elemento(orientacion, Pared(), habitacion)
+        self.laberinto.agregar_hijo(habitacion)
+        return habitacion
+    
+    def fabricarJuego(self):
+        self.juego = Juego(laberinto=None, bichos=[], personaje=None, prototipo=None)
+        self.juego.prototipo = self.laberinto
+        self.juego.laberinto = deepcopy(self.juego.prototipo)
+
+    def fabricarPuertaL1Or1L2Or2(self, num1, or1, num2, or2):
+        habitacion1 = self.laberinto.obtenerHabitacion(num1)
+        habitacion2 = self.laberinto.obtenerHabitacion(num2)
+
+        puerta = Puerta(lado1=habitacion1, lado2=habitacion2)
+        puerta.agregarComando(Abrir(receptor=puerta))
+
+        orientacion1 = self.obtenerOrientacion(or1)
+        orientacion2 = self.obtenerOrientacion(or2)
+
+        habitacion1.poner_en_or_elemento(orientacion1, puerta, habitacion1)
+        habitacion2.poner_en_or_elemento(orientacion2, puerta, habitacion2)
+
+    def obtenerOrientacion(self, or_str):
+        if or_str == "norte":
+            return self.fabricarNorte()
+        elif or_str == "sur":
+            return self.fabricarSur()
+        elif or_str == "este":
+            return self.fabricarEste()
+        elif or_str == "oeste":
+            return self.fabricarOeste()
+        else:
+            raise ValueError("Orientación no reconocida.")
+
+    def fabricarTunelEn(self, contenedor):
+        tunel = Tunel()
+        tunel.agregarComando(Entrar(receptor=tunel))
+        contenedor.agregar_hijo(tunel)
+        return tunel
+
+class LaberintoBuilderRombo(LaberintoBuilder):
+    def construirLaberinto(self):
+        self.laberinto = Laberinto(forma=Rombo())
+
+    def fabricarArmarioEn(self, num, contenedor):
+        armario = Armario(forma=Rombo(), num=num)
+        for orientacion in armario.obtener_orientaciones():
+            armario.poner_en_or_elemento(orientacion, Pared(), armario)
+        contenedor.agregar_hijo(armario)
+        return armario
+
+class Director:
+    def __init__(self):
+        self.builder = None
+        self.dict = {}
+
+    def leerArchivo(self, archivo_json):
+        with open(archivo_json, 'r') as archivo:
+            self.dict = json.load(archivo)
+
+    def iniBuilder(self):
+        forma = self.dict.get("forma", "cuadrado")
+        if forma == "cuadrado":
+            self.builder = LaberintoBuilder()
+        elif forma == "rombo":
+            self.builder = LaberintoBuilderRombo()
+        else:
+            raise ValueError("Forma no reconocida en el archivo JSON.")
 
 
 # ---------------------Ejemplo de uso---------------------
