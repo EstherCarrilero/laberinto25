@@ -319,7 +319,67 @@ class Juego:
         self.person = person
         self.prototipo = prototipo
 
-# Ejemplo de uso
+# Clase Creator
+class Creator:
+    def fabricarBomba(self, em, activa=False):
+        return Bomba(em, activa)
+
+    def fabricarEste(self):
+        return Este()
+
+    def fabricarOeste(self):
+        return Oeste()
+
+    def fabricarNorte(self):
+        return Norte()
+
+    def fabricarSur(self):
+        return Sur()
+
+    def fabricarJuego(self, laberinto, bichos, personaje, prototipo):
+        return Juego(laberinto, bichos, personaje, prototipo)
+
+    def fabricarLaberinto(self, forma=None, num=0):
+        return Laberinto(forma=forma, num=num)
+
+    def fabricarPared(self, padre=None):
+        return Pared(padre)
+
+    def fabricarPuerta(self, lado1=None, lado2=None, estado=None):
+        return Puerta(lado1, lado2, estado)
+
+    def fabricarHabitacion(self, num):
+        habitacion = Habitacion(forma=Cuadrado(), num=num)
+        habitacion.agregar_orientacion(self.fabricarNorte())
+        habitacion.agregar_orientacion(self.fabricarSur())
+        habitacion.agregar_orientacion(self.fabricarEste())
+        habitacion.agregar_orientacion(self.fabricarOeste())
+
+        habitacion.poner_en_or_elemento(self.fabricarNorte(), self.fabricarPared())
+        habitacion.poner_en_or_elemento(self.fabricarSur(), self.fabricarPared())
+        habitacion.poner_en_or_elemento(self.fabricarEste(), self.fabricarPared())
+        habitacion.poner_en_or_elemento(self.fabricarOeste(), self.fabricarPared())
+
+        return habitacion
+
+    def fabricarBichoAgresivo(self, posicion, juego, estado_ente):
+        return Bicho(poder=5, posicion=posicion, vidas=5, juego=juego, estado_ente=estado_ente, modo=Agresivo())
+
+    def fabricarBichoPerezoso(self, posicion, juego, estado_ente):
+        return Bicho(poder=1, posicion=posicion, vidas=1, juego=juego, estado_ente=estado_ente, modo=Perezoso())
+
+    def cambiarModoAgresivo(self, bicho):
+        bicho.modo = Agresivo()
+        bicho.poder = 5
+        bicho.vidas = 5
+
+# Subclase CreatorB
+class CreatorB(Creator):
+    def fabricarPared(self, padre=None):
+        return ParedBomba(padre, activa=False)
+
+
+# ---------------------Ejemplo de uso---------------------
 if __name__ == "__main__":
     # Crear un laberinto y su prototipo
     forma_cuadrado = Cuadrado()
