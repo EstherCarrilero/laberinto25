@@ -19,6 +19,9 @@ class Orientacion(ABC):
     def caminar(self, ente):
         pass
 
+    def iterar_contenedor(self, funcion, forma):
+        pass
+
 class Norte(Orientacion):
     _instance = None
 
@@ -39,6 +42,10 @@ class Norte(Orientacion):
     def caminar(self, ente):
         if isinstance(ente.posicion.forma, Cuadrado):
             ente.posicion.forma.irAlNorte(ente)
+
+    def iterar_contenedor(self, funcion, forma):
+        if forma.norte:
+            forma.norte.iterar(funcion)
 
 class Sur(Orientacion):
     _instance = None
@@ -61,6 +68,10 @@ class Sur(Orientacion):
         if isinstance(ente.posicion.forma, Cuadrado):
             ente.posicion.forma.irAlSur(ente)
 
+    def iterar_contenedor(self, funcion, forma):
+        if forma.sur:
+            forma.sur.iterar(funcion)
+
 class Este(Orientacion):
     _instance = None
 
@@ -82,6 +93,10 @@ class Este(Orientacion):
         if isinstance(ente.posicion.forma, Cuadrado):
             ente.posicion.forma.irAlEste(ente)
 
+    def iterar_contenedor(self, funcion, forma):
+        if forma.este:
+            forma.este.iterar(funcion)
+
 class Oeste(Orientacion):
     _instance = None
 
@@ -102,6 +117,10 @@ class Oeste(Orientacion):
     def caminar(self, ente):
         if isinstance(ente.posicion.forma, Cuadrado):
             ente.posicion.forma.irAlOeste(ente)
+
+    def iterar_contenedor(self, funcion, forma):
+        if forma.oeste:
+            forma.oeste.iterar(funcion)
 
 class Noreste(Orientacion):
     _instance = None
@@ -255,9 +274,20 @@ class ElementoMapa(ABC):
 
     def iterar(self, funcion):
         funcion(self)
-        if hasattr(self, 'hijos'):
-            for hijo in self.hijos:
-                hijo.iterar(funcion)
+        # funcion(self)
+        # if hasattr(self, 'hijos'):
+        #     for hijo in self.hijos:
+        #         hijo.iterar(funcion)
+        # if hasattr(self, 'forma') and hasattr(self.forma, 'orientaciones'):
+        #     for orientacion in self.forma.orientaciones:
+        #         orientacion.iterar(funcion, self.forma)
+
+    def eliminarComando(self, comando):
+        if comando in self.comandos:
+            self.comandos.remove(comando)
+
+    def obtenerComandos(self):
+        return self.comandos
 
 class Contenedor(ElementoMapa):
     def __init__(self, padre=None, forma=None, num=0):
@@ -294,6 +324,17 @@ class Contenedor(ElementoMapa):
         for hijo in self.hijos:
             hijo.aceptar(visitor)
 
+    def eliminarHijo(self, hijo):
+        if hijo in self.hijos:
+            self.hijos.remove(hijo)
+
+    def iterar(self, funcion):
+        funcion(self)
+        for hijo in self.hijos:
+            hijo.iterar(funcion)
+        for orientacion in self.obtener_orientaciones:
+            orientacion.iterar_contenedor(funcion, self.forma)
+
 class Habitacion(Contenedor):
     def aceptar(self, visitor):
         visitor.visitarHabitacion(self)
@@ -322,6 +363,21 @@ class Laberinto(Contenedor):
         visitor.visitarLaberinto(self)
         for hijo in self.hijos:
             hijo.aceptar(visitor)
+
+    def agregarHabitacion(self, habitacion):
+        self.agregar_hijo(habitacion)
+
+    def iterar(self, funcion):
+        funcion(self)
+        for hijo in self.hijos:
+            hijo.iterar(funcion)
+    
+    def abrirPuertas(self):
+        def abrir_puerta(obj):
+            if isinstance(obj, Puerta):
+                print(f"Abriendo puerta", obj)
+                obj.abrir()
+        self.laberinto.recorrer(abrir_puerta)
 
 class Pared(ElementoMapa):
     def entrar(self, ente):
@@ -421,6 +477,11 @@ class Bomba(Decorator):
     def aceptar(self, visitor):
         visitor.visitarBomba(self)
 
+    def entrar(self, ente):
+        if self.activa:
+            ente.vidas -= 5
+            print(f"{ente} ha chocado con una bomba. Vida = {ente.vidas}")
+
 class Tunel(Hoja):
     def __init__(self, laberinto=None):
         super().__init__()
@@ -446,24 +507,16 @@ class Comando(ABC):
         self.receptor = receptor
 
     @abstractmethod
-    def ejecutar(self):
+    def ejecutar(self, ente):
         pass
 
-class Entrar(Comando):
-    def ejecutar(self):
-        print(f"Entrando a {self.receptor}")
+class AbrirPuerta(Comando):
+    def ejecutar(self, ente):
+        self.receptor.abrir()
 
-class Activar(Comando):
-    def ejecutar(self):
-        print(f"Activando {self.receptor}")
-
-class Abrir(Comando):
-    def ejecutar(self):
-        print(f"Abriendo {self.receptor}")
-
-class Cerrar(Comando):
-    def ejecutar(self):
-        print(f"Cerrando {self.receptor}")
+class EntrarTunel(Comando):
+    def ejecutar(self, ente):
+        self.receptor.entrar(ente)
 
 # Clase Ente y sus subclases
 class Ente(ABC):
@@ -820,7 +873,7 @@ class LaberintoBuilder:
         habitacion2 = self.laberinto.obtenerHabitacion(num2)
 
         puerta = Puerta(lado1=habitacion1, lado2=habitacion2)
-        puerta.agregarComando(Abrir(receptor=puerta))
+        puerta.agregarComando(AbrirPuerta(receptor=puerta))
 
         orientacion1 = self.obtenerOrientacion(or1)
         orientacion2 = self.obtenerOrientacion(or2)
@@ -842,7 +895,7 @@ class LaberintoBuilder:
 
     def fabricarTunelEn(self, contenedor):
         tunel = Tunel()
-        tunel.agregarComando(Entrar(receptor=tunel))
+        tunel.agregarComando(EntrarTunel(receptor=tunel))
         contenedor.agregar_hijo(tunel)
         return tunel
 
@@ -982,8 +1035,11 @@ if __name__ == "__main__":
     juego.laberinto.aceptar(visitor)
 
     # Crear un personaje de ejemplo
-    personaje = Personaje(poder=10, posicion=None, vidas=3, juego=juego, estado_ente=Vivo(), nombre="Heroe")
-    juego.personaje = personaje
+    juego.agregarPersonaje("Heroe")
 
-    # Hacer que el personaje entre en la habitación 1 del laberinto
-    juego.laberinto.entrar(personaje)
+    # Lanzar todos los bichos
+    juego.lanzarBichos()
+
+    # Terminar un bicho específico
+    if juego.bichos:
+        juego.terminarBicho(juego.bichos[0])
