@@ -1,0 +1,13 @@
+{
+	"forma":"rombo", 
+    "laberinto":[
+	{"tipo":"habitacion", "num":1, "hijos":[
+        {"tipo":"tunel"}
+    ]}, 
+	{"tipo":"habitacion", "num":2, "hijos":[]}
+	], 
+	"puertas":[
+	[1, "Sureste", 2, "Noroeste"]
+	], 
+	"bichos":[{"modo":"Agresivo", "posicion":1}]
+}
