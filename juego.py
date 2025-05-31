@@ -203,6 +203,12 @@ class ElementoMapa(ABC):
     def aceptar(self, visitor):
         pass
 
+    def iterar(self, funcion):
+        funcion(self)
+        if hasattr(self, 'hijos'):
+            for hijo in self.hijos:
+                hijo.iterar(funcion)
+
 class Contenedor(ElementoMapa):
     def __init__(self, padre=None, forma=None, num=0):
         super().__init__(padre)
@@ -284,14 +290,44 @@ class Puerta(ElementoMapa):
         super().__init__()
         self.lado1 = lado1
         self.lado2 = lado2
-        self.estado = estado
+        self.estado = estado if estado else Cerrada()
+
+    def __str__(self):
+        return f"Puerta {self.lado1.num}-{self.lado2.num}"
 
     def aceptar(self, visitor):
         visitor.visitarPuerta(self)
 
-class EstadoPuerta(ABC): pass
-class Abierta(EstadoPuerta): pass
-class Cerrada(EstadoPuerta): pass
+    def abrir(self):
+        self.estado.abrir(self)
+
+    def cerrar(self):
+        self.estado.cerrar(self)
+
+class EstadoPuerta(ABC):
+    @abstractmethod
+    def abrir(self, puerta):
+        pass
+
+    @abstractmethod
+    def cerrar(self, puerta):
+        pass
+
+class Abierta(EstadoPuerta):
+    def abrir(self, puerta):
+        pass
+
+    def cerrar(self, puerta):
+        print(f"La {puerta} está cerrada.")
+        puerta.estado = Cerrada()
+
+class Cerrada(EstadoPuerta):
+    def abrir(self, puerta):
+        print(f"La {puerta} está abierta.")
+        puerta.estado = Abierta()
+
+    def cerrar(self, puerta):
+        pass
 
 class Hoja(ElementoMapa): pass
 class Decorator(Hoja):
@@ -423,6 +459,12 @@ class Juego:
     def agregarBicho(self, bicho):
         self.bichos.append(bicho)
         bicho.juego = self
+
+    def abrirPuertas(self):
+        self.laberinto.abrirPuertas()
+
+    def cerrarPuertas(self):
+        self.laberinto.cerrarPuertas()
 
 # Clase Creator
 class Creator:
@@ -714,6 +756,15 @@ if __name__ == "__main__":
 
     # Obtener el juego
     juego = director.obtenerJuego()
+
+    # Abrir todas las puertas del laberinto
+    juego.abrirPuertas()
+
+    # Crear un visitante para activar bombas
+    visitor = VisitorActivarBombas()
+
+    # Aceptar el visitante en el laberinto para activar bombas
+    juego.laberinto.aceptar(visitor)
 
     # Crear un personaje de ejemplo
     personaje = Personaje(poder=10, posicion=None, vidas=3, juego=juego, estado_ente=Vivo(), nombre="Heroe")
