@@ -200,6 +200,9 @@ class ElementoMapa(ABC):
     def agregarComando(self, comando):
         self.comandos.append(comando)
 
+    def aceptar(self, visitor):
+        pass
+
 class Contenedor(ElementoMapa):
     def __init__(self, padre=None, forma=None, num=0):
         super().__init__(padre)
@@ -231,8 +234,20 @@ class Contenedor(ElementoMapa):
         ente.posicion = self
         ente.buscarTunel()
 
-class Habitacion(Contenedor): pass
-class Armario(Contenedor): pass
+    def aceptar(self, visitor):
+        for hijo in self.hijos:
+            hijo.aceptar(visitor)
+
+class Habitacion(Contenedor):
+    def aceptar(self, visitor):
+        visitor.visitarHabitacion(self)
+        super().aceptar(visitor)
+
+class Armario(Contenedor): 
+    def aceptar(self, visitor):
+        visitor.visitarArmario(self)
+        super().aceptar(visitor)
+
 class Laberinto(Contenedor):
     def obtenerHabitacion(self, num):
         for hijo in self.hijos:
@@ -247,7 +262,18 @@ class Laberinto(Contenedor):
         else:
             print("No se encontró la habitación número 1.")
 
-class Pared(ElementoMapa): pass
+    def aceptar(self, visitor):
+        visitor.visitarLaberinto(self)
+        for hijo in self.hijos:
+            hijo.aceptar(visitor)
+
+class Pared(ElementoMapa):
+    def entrar(self, ente):
+        print(f"{ente} ha chocado con una pared.")
+
+    def aceptar(self, visitor):
+        visitor.visitarPared(self)
+
 class ParedBomba(Pared):
     def __init__(self, padre=None, activa=False):
         super().__init__(padre)
@@ -259,6 +285,9 @@ class Puerta(ElementoMapa):
         self.lado1 = lado1
         self.lado2 = lado2
         self.estado = estado
+
+    def aceptar(self, visitor):
+        visitor.visitarPuerta(self)
 
 class EstadoPuerta(ABC): pass
 class Abierta(EstadoPuerta): pass
@@ -275,6 +304,16 @@ class Bomba(Decorator):
         super().__init__(em)
         self.activa = activa
 
+    def activar(self):
+        self.activa = True
+        print("La bomba está activa.")
+
+    def __str__(self):
+        return "bomba"
+
+    def aceptar(self, visitor):
+        visitor.visitarBomba(self)
+
 class Tunel(Hoja):
     def __init__(self, laberinto=None):
         super().__init__()
@@ -290,6 +329,9 @@ class Tunel(Hoja):
                 return
 
         self.laberinto.entrar(ente)
+
+    def aceptar(self, visitor):
+        visitor.visitarTunel(self)
 
 # Clase Comando y sus subclases
 class Comando(ABC):
@@ -366,6 +408,7 @@ class Agresivo(Modo):
                     else:
                         print(f"{bicho} ha encontrado un túnel, pero no tiene un laberinto creado.")
                     return
+
 class Perezoso(Modo): pass
 
 # Clase Juego
@@ -637,6 +680,29 @@ class Director:
         self.leerArchivo(archivo_json)
         self.iniBuilder()
         self.construirLaberinto()
+
+class Visitor(ABC):
+    def visitarArmario(self, armario):
+        pass
+
+    def visitarBomba(self, bomba):
+        pass
+
+    def visitarHabitacion(self, habitacion):
+        pass
+
+    def visitarPared(self, pared):
+        pass
+
+    def visitarPuerta(self, puerta):
+        pass
+
+    def visitarTunel(self, tunel):
+        pass
+
+class VisitorActivarBombas(Visitor):
+    def visitarBomba(self, bomba):
+        bomba.activar()
 
 # Ejemplo de uso
 if __name__ == "__main__":
