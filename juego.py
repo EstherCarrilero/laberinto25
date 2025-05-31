@@ -2,6 +2,8 @@ import json
 from copy import deepcopy
 from abc import ABC, abstractmethod
 import random
+import threading
+import time
 
 # Patrón Singleton para las orientaciones
 class Orientacion(ABC):
@@ -11,6 +13,10 @@ class Orientacion(ABC):
 
     @abstractmethod
     def obtener_elemento_or(self, forma):
+        pass
+
+    @abstractmethod
+    def caminar(self, ente):
         pass
 
 class Norte(Orientacion):
@@ -29,6 +35,10 @@ class Norte(Orientacion):
         if isinstance(forma, Cuadrado):
             return forma.norte
         return None
+    
+    def caminar(self, ente):
+        if isinstance(ente.posicion.forma, Cuadrado):
+            ente.posicion.forma.irAlNorte(ente)
 
 class Sur(Orientacion):
     _instance = None
@@ -46,6 +56,10 @@ class Sur(Orientacion):
         if isinstance(forma, Cuadrado):
             return forma.sur
         return None
+    
+    def caminar(self, ente):
+        if isinstance(ente.posicion.forma, Cuadrado):
+            ente.posicion.forma.irAlSur(ente)
 
 class Este(Orientacion):
     _instance = None
@@ -63,6 +77,10 @@ class Este(Orientacion):
         if isinstance(forma, Cuadrado):
             return forma.este
         return None
+    
+    def caminar(self, ente):
+        if isinstance(ente.posicion.forma, Cuadrado):
+            ente.posicion.forma.irAlEste(ente)
 
 class Oeste(Orientacion):
     _instance = None
@@ -80,6 +98,10 @@ class Oeste(Orientacion):
         if isinstance(forma, Cuadrado):
             return forma.oeste
         return None
+    
+    def caminar(self, ente):
+        if isinstance(ente.posicion.forma, Cuadrado):
+            ente.posicion.forma.irAlOeste(ente)
 
 class Noreste(Orientacion):
     _instance = None
@@ -168,6 +190,18 @@ class Forma(ABC):
 
     def obtener_orientacion_aleatoria(self):
         return random.choice(self.orientaciones)
+    
+    def irAlNorte(self, ente):
+        pass
+
+    def irAlSur(self, ente):
+        pass
+
+    def irAlEste(self, ente):
+        pass
+
+    def irAlOeste(self, ente):
+        pass
 
 class Cuadrado(Forma):
     def __init__(self):
@@ -177,6 +211,22 @@ class Cuadrado(Forma):
         self.este = None
         self.oeste = None
         self.orientaciones = [Norte(), Sur(), Este(), Oeste()]
+
+    def irAlNorte(self, ente):
+        if self.norte:
+            self.norte.entrar(ente)
+
+    def irAlSur(self, ente):
+        if self.sur:
+            self.sur.entrar(ente)
+
+    def irAlEste(self, ente):
+        if self.este:
+            self.este.entrar(ente)
+
+    def irAlOeste(self, ente):
+        if self.oeste:
+            self.oeste.entrar(ente)
 
 class Rombo(Forma):
     def __init__(self):
@@ -304,6 +354,17 @@ class Puerta(ElementoMapa):
     def cerrar(self):
         self.estado.cerrar(self)
 
+    def entrar(self, ente):
+        self.estado.entrarPuerta(self, ente)
+
+    def puedeEntrar(self, ente):
+        if ente.posicion == self.lado1:
+            print(f"{ente} ha entrado en {self.lado2}.")
+            ente.posicion = self.lado2
+        else:
+            print(f"{ente} ha entrado en {self.lado1}.")
+            ente.posicion = self.lado1
+
 class EstadoPuerta(ABC):
     @abstractmethod
     def abrir(self, puerta):
@@ -311,6 +372,10 @@ class EstadoPuerta(ABC):
 
     @abstractmethod
     def cerrar(self, puerta):
+        pass
+
+    @abstractmethod
+    def entrarPuerta(self, puerta, ente):
         pass
 
 class Abierta(EstadoPuerta):
@@ -321,6 +386,9 @@ class Abierta(EstadoPuerta):
         print(f"La {puerta} está cerrada.")
         puerta.estado = Cerrada()
 
+    def entrarPuerta(self, puerta, ente):
+        puerta.puedeEntrar(ente)
+
 class Cerrada(EstadoPuerta):
     def abrir(self, puerta):
         print(f"La {puerta} está abierta.")
@@ -328,6 +396,9 @@ class Cerrada(EstadoPuerta):
 
     def cerrar(self, puerta):
         pass
+
+    def entrarPuerta(self, puerta, ente):
+        print(f"{ente} se ha chocado con {puerta}.")
 
 class Hoja(ElementoMapa): pass
 class Decorator(Hoja):
@@ -406,9 +477,47 @@ class Ente(ABC):
     def buscarTunel(self):
         pass
 
-class EstadoEnte(ABC): pass
-class Vivo(EstadoEnte): pass
-class Muerto(EstadoEnte): pass
+    def atacar(self):
+        self.estado_ente.atacar(self)
+
+    def puedeAtacar(self):
+        pass
+
+    def esAtacadoPor(self, atacante):
+        self.vidas -= atacante.poder
+        print(f"{self} ha sido atacado por {atacante}. Vida restante: {self.vidas}")
+        if self.vidas <= 0:
+            self.heMuerto()
+
+    def heMuerto(self):
+        self.estado_ente = Muerto()
+        self.avisar()
+
+    def avisar(self):
+        pass
+
+class EstadoEnte(ABC):
+    @abstractmethod
+    def actuar(self, bicho):
+        pass
+
+    @abstractmethod
+    def atacar(self, ente):
+        pass
+
+class Vivo(EstadoEnte):
+    def actuar(self, bicho):
+        bicho.puedeActuar()
+
+    def atacar(self, ente):
+        ente.puedeAtacar()
+
+class Muerto(EstadoEnte):
+    def actuar(self, bicho):
+        pass
+
+    def atacar(self, ente):
+        pass
 
 class Bicho(Ente):
     def __init__(self, poder, posicion, vidas, juego, estado_ente, modo):
@@ -420,11 +529,35 @@ class Bicho(Ente):
     
     def __str__(self):
         return f"unBicho-{str(self.modo)}"
+    
+    def obtenerOrientacion(self, or_str):
+        return self.posicion.obtener_orientacion_aleatoria()
+    
+    def puedeAtacar(self):
+        self.juego.buscarPersonaje(self)
+
+    def puedeActuar(self):
+        self.modo.actuar(self)
+
+    def actuar(self):
+        self.estado_ente.actuar(self)
+
+    def avisar(self):
+        self.juego.terminarBicho(self)
 
 class Personaje(Ente):
     def __init__(self, poder, posicion, vidas, juego, estado_ente, nombre):
         super().__init__(poder, posicion, vidas, juego, estado_ente)
         self.nombre = nombre
+
+    def __str__(self):
+        return self.nombre
+
+    def puedeAtacar(self):
+        self.juego.buscarBicho(self)
+
+    def avisar(self):
+        self.juego.muerePersonaje()
 
 class Modo(ABC):
     def __str__(self):
@@ -432,6 +565,22 @@ class Modo(ABC):
     
     def buscarTunelBicho(self, bicho):
         pass
+
+    def actuar(self, bicho):
+        self.dormir(bicho)
+        self.caminar(bicho)
+        self.atacar(bicho)
+
+    @abstractmethod
+    def dormir(self, bicho):
+        pass
+
+    @abstractmethod
+    def caminar(self, bicho):
+        pass
+
+    def atacar(self, bicho):
+        bicho.atacar()
 
 class Agresivo(Modo):
     def buscarTunelBicho(self, bicho):
@@ -444,8 +593,23 @@ class Agresivo(Modo):
                     else:
                         print(f"{bicho} ha encontrado un túnel, pero no tiene un laberinto creado.")
                     return
+                
+    def dormir(self, bicho):
+        print(f"{bicho} está durmiendo.")
+        time.sleep(1)
 
-class Perezoso(Modo): pass
+    def caminar(self, bicho):
+        orientacion = bicho.obtenerOrientacion()
+        orientacion.caminar(bicho)
+
+class Perezoso(Modo):
+    def dormir(self, bicho):
+        print(f"{bicho} está durmiendo.")
+        time.sleep(3)
+
+    def caminar(self, bicho):
+        orientacion = bicho.obtenerOrientacion()
+        orientacion.caminar(bicho)
 
 # Clase Juego
 class Juego:
@@ -460,11 +624,62 @@ class Juego:
         self.bichos.append(bicho)
         bicho.juego = self
 
+    def eliminarBicho(self, bicho):
+        if bicho in self.bichos:
+            self.bichos.remove(bicho)
+
+    def agregarPersonaje(self, nombre):
+        personaje = Personaje(poder=10, posicion=None, vidas=3, juego=self, estado_ente=Vivo(), nombre=nombre)
+        self.personaje = personaje
+        personaje.juego = self
+        self.laberinto.entrar(personaje)
+
+    def ganaPersonaje(self):
+        print("¡El personaje ha ganado! El juego ha terminado.")
+
+    def muerePersonaje(self):
+        print("¡Fin de la partida! Los bichos han ganado.")
+        self.terminarBichos()
+
     def abrirPuertas(self):
         self.laberinto.abrirPuertas()
 
     def cerrarPuertas(self):
         self.laberinto.cerrarPuertas()
+
+    def lanzarBicho(self, bicho):
+        def ciclo_vida_bicho():
+            while isinstance(bicho.estado_ente, Vivo):
+                bicho.actuar()
+
+        hilo = threading.Thread(target=ciclo_vida_bicho)
+        hilo.start()
+        self.hilos.append(hilo)
+
+    def lanzarBichos(self):
+        for bicho in self.bichos:
+            self.lanzarBicho(bicho)
+
+    def terminarBicho(self, bicho):
+        bicho.vidas = 0
+        bicho.estado_ente = Muerto()
+        print(f"{bicho} ha muerto.")
+        self.eliminarBicho(bicho)
+        if all(isinstance(b.estado_ente, Muerto) for b in self.bichos):
+            self.ganaPersonaje()
+
+    def terminarBichos(self):
+        for bicho in self.bichos:
+            self.terminarBicho(bicho)
+
+    def buscarPersonaje(self, bicho):
+        if bicho.posicion == self.personaje.posicion:
+            self.personaje.esAtacadoPor(bicho)
+
+    def buscarBicho(self, personaje):
+        for bicho in self.bichos:
+            if bicho.posicion == personaje.posicion and isinstance(bicho.estado_ente, Vivo):
+                bicho.esAtacadoPor(personaje)
 
 # Clase Creator
 class Creator:
