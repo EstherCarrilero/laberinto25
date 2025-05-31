@@ -547,7 +547,7 @@ class LaberintoBuilder:
         return tunel
 
 class LaberintoBuilderRombo(LaberintoBuilder):
-    def construirLaberinto(self):
+    def fabricarLaberinto(self):
         self.laberinto = Laberinto(forma=Rombo())
 
     def fabricarArmarioEn(self, num, contenedor):
@@ -556,6 +556,26 @@ class LaberintoBuilderRombo(LaberintoBuilder):
             armario.poner_en_or_elemento(orientacion, Pared(), armario)
         contenedor.agregar_hijo(armario)
         return armario
+
+    def fabricarNoreste(self):
+        return Noreste()
+
+    def fabricarNoroeste(self):
+        return Noroeste()
+
+    def fabricarSureste(self):
+        return Sureste()
+
+    def fabricarSuroeste(self):
+        return Suroeste()
+
+    def fabricarForma(self):
+        forma = Rombo()
+        forma.agregar_orientacion(self.fabricarNoreste())
+        forma.agregar_orientacion(self.fabricarNoroeste())
+        forma.agregar_orientacion(self.fabricarSureste())
+        forma.agregar_orientacion(self.fabricarSuroeste())
+        return forma
 
 class Director:
     def __init__(self):
@@ -574,46 +594,64 @@ class Director:
             self.builder = LaberintoBuilderRombo()
         else:
             raise ValueError("Forma no reconocida en el archivo JSON.")
+        
+    def construirLaberinto(self):
+        if self.builder:
+            self.builder.fabricarLaberinto()
+            self.fabricarHabitaciones()
+            self.fabricarPuertas()
+            self.fabricarBichos()
+            self.fabricarJuego()
 
+    def fabricarHabitaciones(self):
+        for item in self.dict.get("laberinto", []):
+            if item["tipo"] == "habitacion":
+                habitacion = self.builder.fabricarHabitacion(item["num"])
+                for hijo in item.get("hijos", []):
+                    if hijo["tipo"] == "armario":
+                        self.builder.fabricarArmarioEn(hijo["num"], habitacion)
+                    elif hijo["tipo"] == "bomba":
+                        self.builder.fabricarBombaEn(habitacion)
+                    elif hijo["tipo"] == "tunel":
+                        self.builder.fabricarTunelEn(habitacion)
 
-# ---------------------Ejemplo de uso---------------------
+    def fabricarPuertas(self):
+        for puerta in self.dict.get("puertas", []):
+            self.builder.fabricarPuertaL1Or1L2Or2(puerta[0], puerta[1], puerta[2], puerta[3])
+
+        
+    def fabricarBichos(self):
+        bichos = self.dict.get('bichos', [])
+        for bicho_info in bichos:
+            modo = bicho_info.get('modo')
+            posicion = bicho_info.get('posicion')
+            self.builder.fabricarBichoModoPosicion(modo, posicion)
+
+    def obtenerJuego(self):
+        return self.builder.obtenerJuego()
+    
+    def fabricarJuego(self):
+        self.builder.fabricarJuego()
+
+    def procesar(self, archivo_json):
+        self.leerArchivo(archivo_json)
+        self.iniBuilder()
+        self.construirLaberinto()
+
+# Ejemplo de uso
 if __name__ == "__main__":
-    # Crear un laberinto y su prototipo
-    forma_cuadrado = Cuadrado()
-    laberinto = Laberinto(forma=forma_cuadrado, num=1)
-    prototipo = deepcopy(laberinto)
+    # Crear un director
+    director = Director()
 
-    # Crear habitaciones y puertas
-    habitacion1 = Habitacion(forma=forma_cuadrado, num=1)
-    habitacion2 = Habitacion(forma=forma_cuadrado, num=2)
-    puerta = Puerta(lado1=habitacion1, lado2=habitacion2, estado=Cerrada())
+    # Procesar el archivo JSON
+    director.procesar('configuracion_laberinto.json')
 
-    # Agregar elementos al laberinto
-    laberinto.agregar_hijo(habitacion1)
-    laberinto.agregar_hijo(habitacion2)
-    laberinto.agregar_hijo(puerta)
+    # Obtener el juego
+    juego = director.obtenerJuego()
 
-    # Crear un personaje y bichos
-    personaje = Personaje(poder=10, posicion=habitacion1, vidas=3, juego=None, estado_ente=Vivo(), nombre="Heroe")
-    bicho = Bicho(poder=5, posicion=habitacion2, vidas=1, juego=None, estado_ente=Vivo(), modo=Agresivo())
+    # Crear un personaje de ejemplo
+    personaje = Personaje(poder=10, posicion=None, vidas=3, juego=juego, estado_ente=Vivo(), nombre="Heroe")
+    juego.personaje = personaje
 
-    # Crear el juego
-    juego = Juego(laberinto=laberinto, bichos=[bicho], person=personaje, prototipo=prototipo)
-    personaje.juego = juego
-    bicho.juego = juego
-
-    # Ejecutar comandos
-    comando_entrar = Entrar(receptor=habitacion1)
-    comando_entrar.ejecutar()
-
-    comando_abrir = Abrir(receptor=puerta)
-    comando_abrir.ejecutar()
-
-    # Probar los nuevos métodos
-    nueva_orientacion = Norte()
-    laberinto.poner_en_or_elemento(nueva_orientacion, puerta)
-    elemento = laberinto.obtener_elemento_or(nueva_orientacion)
-    print("Elemento en orientación Norte:", elemento)
-
-    orientacion_aleatoria = laberinto.obtener_orientacion_aleatoria()
-    print("Orientación aleatoria:", type(orientacion_aleatoria).__name__)
+    # Hacer que el personaje entre en la habitación 1 del laberinto
+    juego.laberinto.entrar(personaje)
