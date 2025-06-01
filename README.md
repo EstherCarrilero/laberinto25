@@ -2,5 +2,6 @@
 Juego del laberinto del curso de Diseño de Software 2024-2025
 
 ## Diagrama de clases
-![image](https://github.com/user-attachments/assets/52d3cb52-a18d-4cb3-82c6-d5a6d9195254)
+![image](https://github.com/user-attachments/assets/dfac5cf7-2020-40c9-8624-6543431029b6)
+
 
