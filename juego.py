@@ -274,13 +274,6 @@ class ElementoMapa(ABC):
 
     def iterar(self, funcion):
         funcion(self)
-        # funcion(self)
-        # if hasattr(self, 'hijos'):
-        #     for hijo in self.hijos:
-        #         hijo.iterar(funcion)
-        # if hasattr(self, 'forma') and hasattr(self.forma, 'orientaciones'):
-        #     for orientacion in self.forma.orientaciones:
-        #         orientacion.iterar(funcion, self.forma)
 
     def eliminarComando(self, comando):
         if comando in self.comandos:
@@ -501,7 +494,7 @@ class Bomba(Decorator):
         visitor.visitarBomba(self)
 
     def entrar(self, ente):
-        if self.activa:
+        if self.activa and isinstance(ente, Personaje):
             if isinstance(ente.clase, Tanque):
                 print(f"{ente} ha chocado con una bomba, pero es un tanque y no le afecta.")
             else:
@@ -1193,7 +1186,7 @@ class Inventario:
         self.elementos.remove(elemento)
 
 # Clase ElementoRecogible
-class ElementoRecogible(ElementoMapa):
+class ElementoRecogible(Hoja):
     def __init__(self, nombre):
         super().__init__()
         self.nombre = nombre
@@ -1335,15 +1328,16 @@ class Candado(Decorator):
         visitor.visitarPuerta(self)
 
     def abrir(self, personaje):
-        tiene_llave = any(isinstance(elemento, Llave) and elemento.nombre == self.nombre for elemento in personaje.inventario.elementos)
-        if tiene_llave:
-            print(f"{personaje} ha abierto la puerta con candado usando una llave.")
-            self.em.abrir()
-            self.em.entrar(personaje)
-            print(f"¡{personaje} ha entrado a la habitación del tesoro!")
-            personaje.juego.ganaPersonaje()
-        else:
-            print(f"{personaje} no tiene la llave para abrir la puerta {self.em} con candado.")
+        if isinstance(personaje, Personaje):
+            tiene_llave = any(isinstance(elemento, Llave) and elemento.nombre == self.nombre for elemento in personaje.inventario.elementos)
+            if tiene_llave:
+                print(f"{personaje} ha abierto la puerta con candado usando una llave.")
+                self.em.abrir()
+                self.em.entrar(personaje)
+                print(f"¡{personaje} ha entrado a la habitación del tesoro!")
+                personaje.juego.ganaPersonaje()
+            else:
+                print(f"{personaje} no tiene la llave para abrir la puerta {self.em} con candado.")
 
     def entrar(self, ente):
         self.abrir(ente)
@@ -1381,7 +1375,6 @@ class Curandero(ClasePersonaje):
 # Ejemplo de uso
 if __name__ == "__main__":
     # Crear un director
-    # %%
     director = Director()
 
     # Procesar el archivo JSON
@@ -1389,9 +1382,10 @@ if __name__ == "__main__":
 
     # Obtener el juego
     juego = director.obtenerJuego()
-
+# %%
     # Abrir todas las puertas del laberinto
     juego.abrirPuertas()
+
 # %%
     # Crear un visitante para activar bombas
     visitor = VisitorActivarBombas()
@@ -1406,17 +1400,6 @@ if __name__ == "__main__":
     juego.lanzarBichos()
 
     #juego.terminarBichos()
-
-    # Terminar un bicho específico
-    # if juego.bichos:
-    #     juego.terminarBicho(juego.bichos[0])
-
-    hab2 = juego.laberinto.obtenerHabitacion(2)
-    
-    for i in hab2.hijos:
-        print(i)
-    
-    print(hab2.hijos[2].comandos[0])
 # %%
     # Obtener comandos
     personaje = juego.person
@@ -1438,8 +1421,8 @@ if __name__ == "__main__":
 
     # Comandos
     comandos[0].ejecutar(personaje)
-    comandos[3].ejecutar(personaje)
-    comandos[5].ejecutar(personaje)
+    comandos[1].ejecutar(personaje)
+    comandos[2].ejecutar(personaje)
 
     for i in personaje.obtenerComandos():
         print(i)
