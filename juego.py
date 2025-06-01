@@ -263,7 +263,6 @@ class ElementoMapa(ABC):
         self.padre = padre
         self.comandos = []
 
-    @abstractmethod
     def entrar(self, ente):
         pass
 
@@ -381,7 +380,7 @@ class Laberinto(Contenedor):
         return None
 
     def entrar(self, ente):
-        habitacion = self.obtenerHabitacion(3)
+        habitacion = self.obtenerHabitacion(1)
         if habitacion:
             habitacion.entrar(ente)
         else:
@@ -503,8 +502,11 @@ class Bomba(Decorator):
 
     def entrar(self, ente):
         if self.activa:
-            ente.vidas -= 5
-            print(f"{ente} ha chocado con una bomba. Vida = {ente.vidas}")
+            if isinstance(ente.clase, Tanque):
+                print(f"{ente} ha chocado con una bomba, pero es un tanque y no le afecta.")
+            else:
+                ente.vidas -= 5
+                print(f"{ente} ha chocado con una bomba. Vida = {ente.vidas}")
             self.activa = False
 
 class Tunel(Hoja):
@@ -643,13 +645,27 @@ class Bicho(Ente):
     def avisar(self):
         self.juego.terminarBicho(self)
 
+    def esRobadoPor(self, personaje, arma):
+        if isinstance(arma.modelo, RobaBicho):
+            self.vidas -= personaje.poder
+            personaje.vidas += arma.vida
+        print(f"{self} ha sido atacado por {personaje}. Vida restante: {self.vidas}")
+        print(f"Vida de {personaje} total: {personaje.vidas}")
+        if self.vidas <= 0:
+            self.heMuerto()
+
 class Personaje(Ente):
-    def __init__(self, poder, posicion, vidas, juego, estado_ente, nombre):
+    def __init__(self, poder, posicion, vidas, juego, estado_ente, nombre, clase):
         super().__init__(poder, posicion, vidas, juego, estado_ente)
         self.nombre = nombre
+        self.inventario = Inventario()
+        self.clase = clase
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre}-{str(self.clase)}"
+    
+    def robarVida(self, arma):
+        self.juego.buscarBichoRobar(self, arma)
 
     def puedeAtacar(self):
         self.juego.buscarBicho(self)
@@ -662,6 +678,7 @@ class Personaje(Ente):
         def obtener_comandos(obj):
             comandos.update(obj.obtenerComandos())
         self.posicion.iterar(obtener_comandos)
+        self.inventario.iterar(obtener_comandos)
 
         return list(comandos)
     
@@ -676,6 +693,10 @@ class Personaje(Ente):
 
     def irAlOeste(self):
         self.posicion.irAlOeste(self)
+
+    def curarse(self):
+        if isinstance(self.clase, Curandero):
+            self.clase.habilidad_especial(self)
 
 class Modo(ABC):
     def __str__(self):
@@ -746,8 +767,15 @@ class Juego:
         if bicho in self.bichos:
             self.bichos.remove(bicho)
 
-    def agregarPersonaje(self, nombre):
-        personaje = Personaje(poder=10, posicion=None, vidas=50, juego=self, estado_ente=Vivo(), nombre=nombre)
+    def agregarPersonaje(self, nombre, clase):
+        if clase == "Tanque":
+            personaje = Personaje(poder=6, posicion=None, vidas=70, juego=self, estado_ente=Vivo(), nombre=nombre, clase=Tanque())
+        elif clase == "Asesino":
+            personaje = Personaje(poder=15, posicion=None, vidas=40, juego=self, estado_ente=Vivo(), nombre=nombre, clase=Asesino())
+        elif clase == "Curandero":
+            personaje = Personaje(poder=3, posicion=None, vidas=30, juego=self, estado_ente=Vivo(), nombre=nombre, clase=Curandero())
+        else:
+            raise ValueError("Clase de personaje no reconocida.")
         self.person = personaje
         personaje.juego = self
         self.laberinto.entrar(personaje)
@@ -797,6 +825,11 @@ class Juego:
         for bicho in self.bichos:
             if bicho.posicion == personaje.posicion and isinstance(bicho.estado_ente, Vivo):
                 bicho.esAtacadoPor(personaje)
+
+    def buscarBichoRobar(self, personaje, arma):
+        for bicho in self.bichos:
+            if bicho.posicion == personaje.posicion and isinstance(bicho.estado_ente, Vivo):
+                bicho.esRobadoPor(personaje, arma)
 
 # Clase Creator
 class Creator:
@@ -895,6 +928,36 @@ class LaberintoBuilder:
             self.juego.agregarBicho(bicho)
             bicho.posicion.entrar(bicho)
 
+    def fabricarArmaEn(self, contenedor, nombre, modelo):
+        if modelo == "robabicho":
+            arma = self.fabricarArmaRobaBicho(nombre, modelo)
+            contenedor.agregar_hijo(arma)
+        elif modelo == "chupavida":
+            arma = self.fabricarArmaChupaVida(nombre, modelo)
+            contenedor.agregar_hijo(arma)
+
+    def fabricarArmaRobaBicho(self, nombre, modelo):
+        arma = Arma(nombre=nombre, daño=4, vida=4, modelo=RobaBicho())
+        arma.agregarComando(Recoger(receptor=arma))
+        return arma
+    
+    def fabricarArmaChupaVida(self, nombre, modelo):
+        arma = Arma(nombre=nombre, daño=8, vida=2, modelo=ChupaVida())
+        arma.agregarComando(Recoger(receptor=arma))
+        return arma
+    
+    def fabricarPocionEn(self, contenedor, vida, nombre):
+        pocion = Pocion(nombre=nombre, vidaRestaurada=vida)
+        pocion.agregarComando(Recoger(receptor=pocion))
+        contenedor.agregar_hijo(pocion)
+        return pocion
+    
+    def fabricarLlaveEn(self, contenedor, nombre):
+        llave = Llave(nombre=nombre)
+        llave.agregarComando(Recoger(receptor=llave))
+        contenedor.agregar_hijo(llave)
+        return llave
+
     def fabricarBombaEn(self, contenedor):
         bomba = Bomba()
         contenedor.agregar_hijo(bomba)
@@ -945,6 +1008,20 @@ class LaberintoBuilder:
 
         habitacion1.poner_en_or_elemento(orientacion1, puerta)
         habitacion2.poner_en_or_elemento(orientacion2, puerta)
+
+    def fabricarPuertaConCandadoL1Or1L2Or2(self, num1, or1, num2, or2, nombre):
+        habitacion1 = self.laberinto.obtenerHabitacion(num1)
+        habitacion2 = self.laberinto.obtenerHabitacion(num2)
+
+        puerta = Puerta(lado1=habitacion1, lado2=habitacion2)
+        puerta_con_candado = Candado(puerta, nombre)
+        puerta_con_candado.agregarComando(Desbloquear(receptor=puerta_con_candado))
+
+        orientacion1 = self.obtenerOrientacion(or1)
+        orientacion2 = self.obtenerOrientacion(or2)
+
+        habitacion1.poner_en_or_elemento(orientacion1, puerta_con_candado)
+        habitacion2.poner_en_or_elemento(orientacion2, puerta_con_candado)
 
     def obtenerOrientacion(self, or_str):
         if or_str == "Norte":
@@ -1032,12 +1109,19 @@ class Director:
                         self.builder.fabricarBombaEn(habitacion)
                     elif hijo["tipo"] == "tunel":
                         self.builder.fabricarTunelEn(habitacion)
+                    elif hijo["tipo"] == "arma":
+                        self.builder.fabricarArmaEn(habitacion, hijo["nombre"], hijo["modelo"])
+                    elif hijo["tipo"] == "pocion":
+                        self.builder.fabricarPocionEn(habitacion, hijo["vida"], hijo["nombre"])
+                    elif hijo["tipo"] == "llave":
+                        self.builder.fabricarLlaveEn(habitacion, hijo["nombre"])
 
     def fabricarPuertas(self):
         for puerta in self.dict.get("puertas", []):
             self.builder.fabricarPuertaL1Or1L2Or2(puerta[0], puerta[1], puerta[2], puerta[3])
+        for puerta in self.dict.get("puerta_bloqueada", []):
+            self.builder.fabricarPuertaConCandadoL1Or1L2Or2(puerta[0], puerta[1], puerta[2], puerta[3], puerta[4])
 
-        
     def fabricarBichos(self):
         bichos = self.dict.get('bichos', [])
         for bicho_info in bichos:
@@ -1075,10 +1159,222 @@ class Visitor(ABC):
     def visitarTunel(self, tunel):
         pass
 
+    def visitar_arma(self, arma):
+        pass
+
+    def visitar_llave(self, arma):
+        pass
+
+    def visitar_pocion(self, arma):
+        pass
+
 class VisitorActivarBombas(Visitor):
     def visitarBomba(self, bomba):
         bomba.activar()
 
+#-----------------------------IMPLEMENTACIONES-----------------------------
+# Clase Inventario
+class Inventario:
+    def __init__(self):
+        self.elementos = []
+
+    def agregar_elemento(self, elemento):
+        self.elementos.append(elemento)
+
+    def aceptar(self, visitor):
+        for elemento in self.elementos:
+            elemento.aceptar(visitor)
+
+    def iterar(self, funcion):
+        for elemento in self.elementos:
+            elemento.iterar(funcion)
+
+    def eliminar_elemento(self, elemento):
+        self.elementos.remove(elemento)
+
+# Clase ElementoRecogible
+class ElementoRecogible(ElementoMapa):
+    def __init__(self, nombre):
+        super().__init__()
+        self.nombre = nombre
+
+    def aceptar(self, visitor):
+        pass
+
+    def recoger(self, personaje):
+        pass
+
+class Arma(ElementoRecogible):
+    def __init__(self, nombre, daño, vida, modelo=None):
+        super().__init__(nombre)
+        self.daño = daño
+        self.vida = vida
+        self.modelo = modelo
+
+    def __str__(self):
+        return f"Arma-{str(self.modelo)}-{self.nombre}"
+
+    def aceptar(self, visitor):
+        visitor.visitar_arma(self)
+
+    def recoger(self, personaje):
+        self.comandos = [(Atacar(receptor=self))]
+        personaje.inventario.agregar_elemento(self)
+        print(f"{personaje} ha recogido el arma {self.nombre}. Daño: {self.daño}, Vida: {self.vida}")
+
+    def atacar(self, personaje):
+        self.modelo.atacar(personaje, self)
+
+class Modelo(ABC):
+    @abstractmethod
+    def atacar(self, personaje, arma):
+        pass
+
+class RobaBicho(Modelo):
+    def __str__(self):
+        return self.__class__.__name__
+    
+    def atacar(self, personaje, arma):
+        personaje.poder += arma.daño
+        personaje.robarVida(arma)
+        time.sleep(2)
+
+
+class ChupaVida(Modelo):
+    def __str__(self):
+        return self.__class__.__name__
+    
+    def atacar(self, personaje, arma):
+        personaje.poder += arma.daño
+        personaje.vidas -= arma.vida
+        print(f"{personaje} ha usado {arma.nombre}. Vida total del personaje: {personaje.vidas}")
+        personaje.robarVida(arma)
+        
+
+class Pocion(ElementoRecogible):
+    def __init__(self, nombre, vidaRestaurada):
+        super().__init__(nombre)
+        self.vida_restaurada = vidaRestaurada
+
+    def __str__(self):
+        return f"Pocion-{self.nombre}"
+    
+    def aceptar(self, visitor):
+        visitor.visitar_pocion(self)
+
+    def recoger(self, personaje):
+        self.comandos = [(Usar(receptor=self))]
+        personaje.inventario.agregar_elemento(self)
+        print(f"{personaje} ha recogido la pocion {self.nombre}. Vida que proporciona: {self.vida_restaurada}")
+
+    def usar(self, personaje):
+        personaje.vidas += self.vida_restaurada
+        self.comandos = []
+        personaje.inventario.eliminar_elemento(self)
+        print(f"{personaje} ha usado la poción {self.nombre}. Vida total del personaje: {personaje.vidas}")
+
+class Llave(ElementoRecogible):
+    def aceptar(self, visitor):
+        visitor.visitar_llave(self)
+
+    def __str__(self):
+        return f"Llave-{self.nombre}"
+    
+    def recoger(self, personaje):
+        personaje.inventario.agregar_elemento(self)
+        print(f"{personaje} ha recogido la llave {self.nombre}")
+
+# Clase Visitor para visitar el inventario y listar elementos
+class VisitorInventario(Visitor):
+    def visitar_arma(self, arma):
+        print(f"Arma en inventario: {arma.nombre}- Daño: {arma.daño}- Vida: {arma.vida}")
+
+    def visitar_pocion(self, pocion):
+        print(f"Poción en inventario: {pocion.nombre}- Vida Restaurada: {pocion.vida_restaurada}")
+
+    def visitar_llave(self, llave):
+        print(f"Llave en inventario: {llave.nombre}")
+
+# Comandos para interactuar con el juego
+class Recoger(Comando):
+    def ejecutar(self, ente):
+        self.receptor.recoger(ente)
+
+    def __str__(self):
+        return f"{str(self.__class__.__name__)}-{self.receptor}"
+    
+class Atacar(Comando):
+    def ejecutar(self, ente):
+        self.receptor.atacar(ente)
+
+    def __str__(self):
+        return f"{str(self.__class__.__name__)}-{self.receptor}"
+
+class Usar(Comando):
+    def ejecutar(self, ente):
+        self.receptor.usar(ente)
+
+    def __str__(self):
+        return f"{str(self.__class__.__name__)}-{self.receptor}"
+    
+class Desbloquear(Comando):
+    def ejecutar(self, ente):
+        self.receptor.abrir(ente)
+
+    def __str__(self):
+        return f"{str(self.__class__.__name__)}-{self.receptor}"
+    
+# Clase Candado
+class Candado(Decorator):
+    def __init__(self, puerta, nombre):
+        super().__init__(puerta)
+        self.nombre = nombre
+
+    def aceptar(self, visitor):
+        visitor.visitarPuerta(self)
+
+    def abrir(self, personaje):
+        tiene_llave = any(isinstance(elemento, Llave) and elemento.nombre == self.nombre for elemento in personaje.inventario.elementos)
+        if tiene_llave:
+            print(f"{personaje} ha abierto la puerta con candado usando una llave.")
+            self.em.abrir()
+            print(f"¡{personaje} ha entrado a la habitación del tesoro!")
+            personaje.juego.ganaPersonaje()
+        else:
+            print(f"{personaje} no tiene la llave para abrir la puerta {self.em} con candado.")
+
+    def entrar(self, ente):
+        self.abrir(ente)
+
+    def __str__(self):
+        return f"Puerta con Candado {self.em.lado1.num}-{self.em.lado2.num}"
+
+# Clase ClasePersonaje
+class ClasePersonaje(ABC):
+    @abstractmethod
+    def habilidad_especial(self):
+        pass
+
+    def __str__(self):
+        return self.__class__.__name__
+
+class Tanque(ClasePersonaje):
+    def habilidad_especial(self, personaje): pass
+        # Los tanques resisten más daño de las bombas
+        #print(f"{personaje.nombre} es un Tanque y resiste el daño de las bombas.")
+
+class Asesino(ClasePersonaje):
+    def habilidad_especial(self, personaje): pass
+        # Los asesinos tienen más poder de ataque
+        #print(f"{personaje.nombre} es un Asesino y tiene un alto poder de ataque.")
+
+class Curandero(ClasePersonaje):
+    def habilidad_especial(self, personaje):
+        # Los curanderos pueden curarse a sí mismos
+        print(f"{personaje.nombre} es un Curandero y puede curarse.")
+        personaje.vidas += 10
+        print(f"{personaje.nombre} se ha curado. Vida actual: {personaje.vidas}")
+        time.sleep(3)  # Tiempo de espera para la curación
 # %%
 # Ejemplo de uso
 if __name__ == "__main__":
@@ -1102,7 +1398,7 @@ if __name__ == "__main__":
     juego.laberinto.aceptar(visitor)
 
     # Crear un personaje de ejemplo
-    juego.agregarPersonaje("Heroe")
+    juego.agregarPersonaje("Heroe", "Curandero")
 # %%
     # Lanzar todos los bichos
     juego.lanzarBichos()
@@ -1112,6 +1408,11 @@ if __name__ == "__main__":
     # Terminar un bicho específico
     # if juego.bichos:
     #     juego.terminarBicho(juego.bichos[0])
+
+    hab2 = juego.laberinto.obtenerHabitacion(2)
+    
+    for i in hab2.hijos:
+        print(i)
     # %%
     # Obtener comandos
     personaje = juego.person
@@ -1120,6 +1421,10 @@ if __name__ == "__main__":
         print(i)
 
     comandos = personaje.obtenerComandos()
+
+    visitor_inventario = VisitorInventario()
+
+    print(f"Vida del personaje: {personaje.vidas}")
 # %%
     # Moverse
     personaje.irAlNorte()
@@ -1127,10 +1432,13 @@ if __name__ == "__main__":
     personaje.irAlEste()
     personaje.irAlOeste()
 
-    # Acciones
-    comandos[0].ejecutar(personaje)  # Cerrar una puerta
-    comandos[2].ejecutar(personaje)  # Abrir una puerta
-    comandos[3].ejecutar(personaje)  # Entrar en tunel
+    # Comandos
+    comandos[0].ejecutar(personaje)
+    comandos[2].ejecutar(personaje)  
+    comandos[5].ejecutar(personaje) 
 
-    personaje.atacar()  # Atacar a un bicho si está presente
+    # Acciones
+    personaje.atacar()  # Atacar sin arma a un bicho si está presente
+    personaje.inventario.aceptar(VisitorInventario())  # Listar inventario
+    personaje.curarse()  # Curarse si es un curandero
 # %%

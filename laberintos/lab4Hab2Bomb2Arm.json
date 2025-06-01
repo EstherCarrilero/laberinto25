@@ -2,20 +2,29 @@
 	"forma":"cuadrado", 
     "laberinto":[
 	{"tipo":"habitacion", "num":1, "hijos":[
-		{"tipo":"armario", "num":1, "hijos":[]}, 
-        {"tipo":"bomba"}
+		{"tipo":"armario", "num":1, "hijos":[]}
 		]}, 
-	{"tipo":"habitacion", "num":2, "hijos":[]}, 
+	{"tipo":"habitacion", "num":2, "hijos":[
+		{"tipo":"arma", "modelo":"robabicho", "nombre":"RobaBicho1"}, 
+		{"tipo":"arma", "modelo":"chupavida", "nombre":"ChupaVida1"}, 
+		{"tipo":"pocion", "vida":10, "nombre":"PocionVida1"}
+	]}, 
     {"tipo":"habitacion", "num":3, "hijos":[
         {"tipo":"armario", "num":2, "hijos":[]}, 
-		{"tipo":"tunel"}
+		{"tipo":"tunel"}, 
+		{"tipo":"bomba"}, 
+		{"tipo":"llave", "nombre":"Llave1"}
     ]}, 
     {"tipo":"habitacion", "num":4, "hijos":[
         {"tipo":"bomba"}
-    ]}
+    ]}, 
+	{"tipo":"habitacion", "num":5, "hijos":[]}
 	], 
 	"puertas":[
 	[1, "Sur", 2, "Norte"], [2, "Este", 3, "Oeste"], [3, "Sur", 4, "Norte"]
+	], 
+	"puerta_bloqueada":[
+	[1, "Norte", 5, "Sur", "Llave1"]
 	], 
 	"bichos":[
 		{"modo":"Agresivo", "posicion":1}, 
