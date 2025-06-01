@@ -646,8 +646,8 @@ class Bicho(Ente):
         self.juego.terminarBicho(self)
 
     def esRobadoPor(self, personaje, arma):
+        self.vidas -= personaje.poder
         if isinstance(arma.modelo, RobaBicho):
-            self.vidas -= personaje.poder
             personaje.vidas += arma.vida
         print(f"{self} ha sido atacado por {personaje}. Vida restante: {self.vidas}")
         print(f"Vida de {personaje} total: {personaje.vidas}")
@@ -875,15 +875,15 @@ class Creator:
         return habitacion
 
     def fabricarBichoAgresivo(self, posicion, juego, estado_ente):
-        return Bicho(poder=5, posicion=posicion, vidas=5, juego=juego, estado_ente=estado_ente, modo=Agresivo())
+        return Bicho(poder=5, posicion=posicion, vidas=20, juego=juego, estado_ente=estado_ente, modo=Agresivo())
 
     def fabricarBichoPerezoso(self, posicion, juego, estado_ente):
-        return Bicho(poder=1, posicion=posicion, vidas=1, juego=juego, estado_ente=estado_ente, modo=Perezoso())
+        return Bicho(poder=1, posicion=posicion, vidas=10, juego=juego, estado_ente=estado_ente, modo=Perezoso())
 
     def cambiarModoAgresivo(self, bicho):
         bicho.modo = Agresivo()
         bicho.poder = 5
-        bicho.vidas = 5
+        bicho.vidas = 20
 
 # Subclase CreatorB
 class CreatorB(Creator):
@@ -909,11 +909,11 @@ class LaberintoBuilder:
         return armario
 
     def fabricarBichoAgresivo(self, habitacion):
-        bicho = Bicho(poder=5, posicion=habitacion, vidas=5, juego=self.juego, estado_ente=Vivo(), modo=Agresivo())
+        bicho = Bicho(poder=5, posicion=habitacion, vidas=20, juego=self.juego, estado_ente=Vivo(), modo=Agresivo())
         return bicho
     
     def fabricarBichoPerezoso(self, habitacion):
-        bicho = Bicho(poder=1, posicion=habitacion, vidas=1, juego=self.juego, estado_ente=Vivo(), modo=Perezoso())
+        bicho = Bicho(poder=1, posicion=habitacion, vidas=10, juego=self.juego, estado_ente=Vivo(), modo=Perezoso())
         return bicho
 
     def fabricarBichoModoPosicion(self, modo, num):
@@ -1281,6 +1281,7 @@ class Llave(ElementoRecogible):
         return f"Llave-{self.nombre}"
     
     def recoger(self, personaje):
+        self.comandos = []
         personaje.inventario.agregar_elemento(self)
         print(f"{personaje} ha recogido la llave {self.nombre}")
 
@@ -1338,6 +1339,7 @@ class Candado(Decorator):
         if tiene_llave:
             print(f"{personaje} ha abierto la puerta con candado usando una llave.")
             self.em.abrir()
+            self.em.entrar(personaje)
             print(f"¡{personaje} ha entrado a la habitación del tesoro!")
             personaje.juego.ganaPersonaje()
         else:
@@ -1413,7 +1415,9 @@ if __name__ == "__main__":
     
     for i in hab2.hijos:
         print(i)
-    # %%
+    
+    print(hab2.hijos[2].comandos[0])
+# %%
     # Obtener comandos
     personaje = juego.person
 
@@ -1434,8 +1438,12 @@ if __name__ == "__main__":
 
     # Comandos
     comandos[0].ejecutar(personaje)
-    comandos[2].ejecutar(personaje)  
-    comandos[5].ejecutar(personaje) 
+    comandos[3].ejecutar(personaje)
+    comandos[5].ejecutar(personaje)
+
+    for i in personaje.obtenerComandos():
+        print(i)
+    comandos = personaje.obtenerComandos()
 
     # Acciones
     personaje.atacar()  # Atacar sin arma a un bicho si está presente
